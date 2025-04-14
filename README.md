@@ -4,7 +4,7 @@
   <img src="Polish-It/macOS/Resources/Assets.xcassets/AppIcon.appiconset/1024.png" width="300" alt="Polish.It Logo">
 </p>
 
-**Polish.It** is a macOS application that helps you refine and enhance your text and code content.It uses advanced AI to help you communicate more effectively.
+**Polish.It** is a macOS application that helps you refine and enhance your text and code content.It uses advanced AI to help you communicate and manage code.
 
 _Main content view_
 ![](screenshots/main-content-view.png)

@@ -7,6 +7,7 @@ class PolishViewModel: ObservableObject {
     @Published var apiKey: String = ""
     @Published var isLoading: Bool = false
     @Published var errorMessage: String = ""
+    @Published var selectedModel: AIModel = AIModel.defaultModel
     
     private let openRouterClient = OpenRouterClient()
     private var currentTask: URLSessionDataTask?
@@ -19,6 +20,28 @@ class PolishViewModel: ObservableObject {
             Logger.log("API key loaded from keychain", level: .info)
         } else {
             Logger.log("No API key found in keychain", level: .warning)
+        }
+        
+        loadSelectedModel()
+    }
+    
+    func loadSelectedModel() {
+        if let savedModelId = KeychainManager.shared.getSelectedModel(),
+           let model = AIModel.availableModels.first(where: { $0.id == savedModelId }) {
+            selectedModel = model
+            Logger.log("Selected model loaded from keychain: \(model.name)", level: .info)
+        } else {
+            selectedModel = AIModel.defaultModel
+            Logger.log("No model found in keychain, using default: \(AIModel.defaultModel.name)", level: .info)
+        }
+    }
+    
+    func saveSelectedModel(_ model: AIModel) {
+        selectedModel = model
+        if KeychainManager.shared.saveSelectedModel(model.id) {
+            Logger.log("Model saved to keychain: \(model.name)", level: .info)
+        } else {
+            Logger.log("Failed to save model to keychain", level: .error)
         }
     }
     
@@ -33,8 +56,11 @@ class PolishViewModel: ObservableObject {
         isLoading = true
         Logger.log("Starting rephrasing process", level: .info)
         
+        // Use the appropriate API key based on model type
+        let effectiveApiKey = selectedModel.isFree ? AIModel.freeModelApiKey : apiKey
+        
         // Send request
-        currentTask = openRouterClient.polish(text: originalText, apiKey: apiKey) { [weak self] result in
+        currentTask = openRouterClient.polish(text: originalText, apiKey: effectiveApiKey, model: selectedModel) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 defer { self.finishRequest() }
@@ -66,7 +92,8 @@ class PolishViewModel: ObservableObject {
     private func validateInputs() -> Bool {
         guard !originalText.isEmpty else { return false }
         
-        guard !apiKey.isEmpty else {
+        // For free models, we can use the built-in API key
+        if !selectedModel.isFree && apiKey.isEmpty {
             errorMessage = "Please enter your OpenRouter API key in Settings"
             showError("Please enter your OpenRouter API key in Settings")
             return false

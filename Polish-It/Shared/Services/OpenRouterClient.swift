@@ -1,13 +1,34 @@
 import Foundation
 
+struct AIModel: Identifiable, Hashable, Equatable, Codable {
+    let id: String
+    let name: String
+    let isFree: Bool
+    
+    static let availableModels: [AIModel] = [
+        AIModel(id: "google/gemini-2.0-flash-thinking-exp:free", name: "Gemini 2.0 Flash (Free)", isFree: true),
+        AIModel(id: "google/gemini-2.0-flash-thinking-exp-1219:free", name: "Gemini 2.0 Flash 1219 (Free)", isFree: true),
+        AIModel(id: "nvidia/llama-3.1-nemotron-ultra-253b-v1:free", name: "Llama 3.1 Nemotron Ultra (Free)", isFree: true),
+        AIModel(id: "featherless/qwerky-72b:free", name: "Qwerky 72B (Free)", isFree: true),
+        AIModel(id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout (Free)", isFree: true),
+        AIModel(id: "deepseek/deepseek-chat-v3-0324:free", name: "DeepSeek Chat v3 (Free)", isFree: true),
+        AIModel(id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", isFree: false),
+        AIModel(id: "openai/gpt-4o-mini", name: "GPT-4o Mini", isFree: false),
+        AIModel(id: "openrouter/optimus-alpha", name: "Optimus Alpha", isFree: false),
+        AIModel(id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B", isFree: false)
+    ]
+    
+    static let defaultModel = availableModels.first(where: { $0.id == "deepseek/deepseek-chat-v3-0324:free" }) ?? availableModels[0]
+    static let freeModelApiKey = "sk-or-v1-free-model-key" // Will be replaced during compilation
+}
+
 class OpenRouterClient {
     private let baseURL = "https://openrouter.ai/api/v1/chat/completions"
-    private let model = "deepseek/deepseek-chat-v3-0324:free"
     
-    func polish(text: String, apiKey: String, completion: @escaping (Result<String, Error>) -> Void) -> URLSessionDataTask? {
+    func polish(text: String, apiKey: String, model: AIModel, completion: @escaping (Result<String, Error>) -> Void) -> URLSessionDataTask? {
         // Validate inputs
-        guard !apiKey.isEmpty else {
-            completion(.failure(createError(code: 401, message: "API key is missing")))
+        guard !text.isEmpty else {
+            completion(.failure(createError(code: 400, message: "Text cannot be empty")))
             return nil
         }
         
@@ -17,10 +38,10 @@ class OpenRouterClient {
         }
         
         // Create request
-        let request = createRequest(url: url, text: text, apiKey: apiKey)
+        let request = createRequest(url: url, text: text, apiKey: apiKey, model: model)
         
         // Send request
-        Logger.log("Sending request to OpenRouter API", level: .info)
+        Logger.log("Sending request to OpenRouter API with model: \(model.name)", level: .info)
         
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
@@ -36,13 +57,7 @@ class OpenRouterClient {
         return task
     }
     
-    // MARK: - Helper Methods
-    
-    private func createError(code: Int, message: String) -> NSError {
-        return NSError(domain: "com.polish.it", code: code, userInfo: [NSLocalizedDescriptionKey: message])
-    }
-    
-    private func createRequest(url: URL, text: String, apiKey: String) -> URLRequest {
+    private func createRequest(url: URL, text: String, apiKey: String, model: AIModel) -> URLRequest {
         let prompt = """
         Polish the following text while preserving its meaning.
         Improve clarity, flow, and readability. Keep the same tone and intent.
@@ -52,7 +67,7 @@ class OpenRouterClient {
         """
         
         let requestBody: [String: Any] = [
-            "model": model,
+            "model": model.id,
             "messages": [
                 ["role": "user", "content": prompt]
             ],
@@ -75,6 +90,10 @@ class OpenRouterClient {
         return request
     }
     
+    private func createError(code: Int, message: String) -> NSError {
+        return NSError(domain: "com.polish.it", code: code, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+    
     private func handleResponse(data: Data?, response: URLResponse?, completion: @escaping (Result<String, Error>) -> Void) {
         guard let httpResponse = response as? HTTPURLResponse else {
             completion(.failure(createError(code: 0, message: "Invalid response")))
@@ -86,11 +105,6 @@ class OpenRouterClient {
         guard let data = data else {
             completion(.failure(createError(code: 0, message: "No data received")))
             return
-        }
-        
-        // Log response for debugging
-        if let responseString = String(data: data, encoding: .utf8) {
-            Logger.log("Response: \(responseString.truncated(to: 200))", level: .debug)
         }
         
         do {

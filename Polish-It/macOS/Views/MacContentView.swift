@@ -25,6 +25,27 @@ struct MacContentView: View {
                             
                             Spacer()
                             
+                            // Model indicator
+                            HStack(spacing: 4) {
+                                Text(viewModel.selectedModel.name)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.primary.opacity(0.7))
+                                
+                                if viewModel.selectedModel.isFree {
+                                    Text("Free")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.green)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Color.green.opacity(0.1))
+                                        .cornerRadius(4)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.primary.opacity(0.05))
+                            .cornerRadius(6)
+                            
                             Button(action: { showSettings.toggle() }) {
                                 Image(systemName: "gear")
                                     .font(.system(size: 14))
@@ -126,8 +147,11 @@ struct MacContentView: View {
             }
         }
         .frame(minWidth: 600, minHeight: 400)
+        .onAppear {
+            viewModel.loadAPIKey()
+        }
         .sheet(isPresented: $showSettings) {
-            SettingsView(apiKey: $viewModel.apiKey)
+            SettingsView(apiKey: $viewModel.apiKey, selectedModel: $viewModel.selectedModel)
         }
     }
 }
